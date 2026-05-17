@@ -1,0 +1,114 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    container_name: school-erp-app
+    restart: unless-stopped
+    working_dir: /app
+    environment:
+      - DB_HOST=mysql
+      - DB_PORT=3306
+      - DB_DATABASE=school_erp
+      - DB_USERNAME=school_user
+      - DB_PASSWORD=school_password
+      - REDIS_HOST=redis
+      - CACHE_DRIVER=redis
+      - SESSION_DRIVER=redis
+      - QUEUE_CONNECTION=redis
+    volumes:
+      - ./:/app
+      - ./storage:/app/storage
+    networks:
+      - school-network
+    depends_on:
+      - mysql
+      - redis
+
+  nginx:
+    image: nginx:alpine
+    container_name: school-erp-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./:/app
+      - ./docker/nginx.conf:/etc/nginx/conf.d/default.conf
+    networks:
+      - school-network
+    depends_on:
+      - app
+
+  mysql:
+    image: mysql:8.0
+    container_name: school-erp-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: school_erp
+      MYSQL_ROOT_PASSWORD: root_password
+      MYSQL_USER: school_user
+      MYSQL_PASSWORD: school_password
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - school-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: school-erp-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - school-network
+
+  phpmyadmin:
+    image: phpmyadmin:latest
+    container_name: school-erp-phpmyadmin
+    restart: unless-stopped
+    environment:
+      PMA_HOST: mysql
+      PMA_USER: school_user
+      PMA_PASSWORD: school_password
+    ports:
+      - "8081:80"
+    networks:
+      - school-network
+    depends_on:
+      - mysql
+
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: school-erp-mailhog
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+    networks:
+      - school-network
+
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: school-erp-redis-commander
+    environment:
+      - REDIS_HOSTS=local:redis:6379
+    ports:
+      - "8082:8081"
+    networks:
+      - school-network
+    depends_on:
+      - redis
+
+volumes:
+  mysql_data:
+  redis_data:
+
+networks:
+  school-network:
+    driver: bridge
